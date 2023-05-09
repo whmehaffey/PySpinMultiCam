@@ -438,7 +438,11 @@ class MultiCamObj:
             
             try:
                 for j in range(self.camcount):
-                    self.cam[j].AasRoiEnable.SetValue(False);
+                    
+                    self.cam[j].OffsetY.SetValue(0)
+                    self.cam[j].OffsetX.SetValue(0)
+                    self.cam[j].Width.SetValue(self.cam[j].WidthMax())
+                    self.cam[j].Height.SetValue(self.cam[j].HeightMax())
                     self.height[j]=self.cam[j].Height();
                     self.width[j]=self.cam[j].Width();                    
             except pyspin.SpinnakerException as ex:
@@ -446,17 +450,29 @@ class MultiCamObj:
             return False
         
     def SetROI(self, rois): # X,Y Offsets, Width, Height
-                            
-            try:
 
+            from math import ceil, floor                            
+            try:
+                
                 for j in range(self.camcount):                    
-                    self.cam[j].AasRoiEnable.SetValue(True);                    
-                    self.cam[j].AasRoiWidth.SetValue(rois[j][2])
-                    self.cam[j].AasRoiHeight.SetValue(rois[j][3])                    
-                    self.cam[j].AasRoiOffsetX.SetValue(rois[j][0])
-                    self.cam[j].AasRoiOffsetY.SetValue(rois[j][1])
-                    self.height[j]=rois[j][2]; #self.cam[j].Height();
-                    self.width[j]=rois[j][3]; #self.cam[j].Width();
+                    #self.cam[j].AasRoiEnable.SetValue(True);
+                    
+                   # pdb.set_trace();
+                    
+                    #Round up widths, must be divisible by 4.
+                    
+                    ScaledbyFour=ceil(rois[j][2]/4)*4;
+                    self.cam[j].Width.SetValue(ScaledbyFour)
+                    ScaledbyFour=ceil(rois[j][3]/4)*4;
+                    self.cam[j].Height.SetValue(ScaledbyFour)
+
+                    #Round down Offsets
+                    ScaledbyFour=floor(rois[j][0]/4)*4;
+                    self.cam[j].OffsetX.SetValue(ScaledbyFour)
+                    ScaledbyFour=floor(rois[j][1]/4)*4;
+                    self.cam[j].OffsetY.SetValue(ScaledbyFour)
+                    self.height[j]=self.cam[j].Height(); #self.cam[j].Height();
+                    self.width[j]=self.cam[j].Width(); #self.cam[j].Width();
                     print('Camera ' + str(j) + ' -> ' +str(self.height[j]) + ' x ' + str(self.width[j]))
                           
                     
@@ -465,21 +481,25 @@ class MultiCamObj:
             return False    
 #### Testing stuff
 ##import cv2
-##cams=listCams();       
+##cams=listCams();
 ##amc=MultiCamObj(cams[0]); #The 2 color blackfly
+##amc.ClearROI();
 ##rois=[]
 ##j=0
 ##Images=amc.SnapImage();
 ##roi=cv2.selectROI('Choose ROI - Enter to select, "c" to cancel',Images[0])
 ##rois.append(roi);
 ##cv2.destroyAllWindows()
+##amc.SetROI(rois)
 ##amc.cam[j].AasRoiEnable.SetValue(True);                    
 ##amc.cam[j].AasRoiWidth.SetValue(rois[j][2])
 ##amc.cam[j].AasRoiHeight.SetValue(rois[j][3])                    
 ##amc.cam[j].AasRoiOffsetX.SetValue(rois[j][0])
 ##amc.cam[j].AasRoiOffsetY.SetValue(rois[j][1])
-##amc.height[j]=amc.cam[j].Height();
-##amc.width[j]=amc.cam[j].Width();
+#amc.height[j]=amc.cam[j].Height();
+#amc.width[j]=amc.cam[j].Width();
+#Images=amc.SnapImage();
+
 #amc.Start();
 ##s_node_map = amc.cam[0].GetTLStreamNodeMap()
 ##buffer_count = pyspin.CIntegerPtr(s_node_map.GetNode('StreamBufferCountManual'))
