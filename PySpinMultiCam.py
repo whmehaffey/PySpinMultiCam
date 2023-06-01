@@ -57,8 +57,8 @@ class MultiCamObj:
             # Set Cam #1 with driver setup on Hirose 
             self.cam[0].LineSelector.SetValue(pyspin.LineSelector_Line2)
             self.cam[0].V3_3Enable.SetValue(True)
-            self.cam[0].AcquisitionFrameRateEnable.SetValue(False)
-            self.cam[0].ExposureAuto.SetValue(False)            
+            self.cam[0].AcquisitionFrameRateEnable.SetValue(True)
+            self.cam[0].ExposureAuto.SetValue(True)            
             s_node_map = self.cam[0].GetTLStreamNodeMap()
             #Up buffers and set to OldestFirst (defaults to newest, fucking assholes)
             
@@ -73,7 +73,7 @@ class MultiCamObj:
             self.height.append(self.cam[0].Height());
             self.width.append(self.cam[0].Width());        
             self.framerate=self.cam[0].AcquisitionFrameRate();           
-            self.exposuretime=self.cam[0].ExposureTime();
+            self.exposuretime=(self.cam[0].ExposureTime())/1000;
             
             if (self.camcount > 1):
                 for i in range(1,self.camcount):   #Syncing setup for follower BlackFlys.                    
@@ -83,8 +83,8 @@ class MultiCamObj:
                     self.cam[i].TriggerMode.SetValue(pyspin.TriggerMode_On)
                     self.height.append(self.cam[i].Height()); #SensorHeight for unbinned!
                     self.width.append(self.cam[i].Width());                    
-                    self.cam[i].AcquisitionFrameRateEnable.SetValue(False)
-                    self.cam[i].ExposureAuto.SetValue(False)
+                   # self.cam[i].AcquisitionFrameRateEnable.SetValue(False)
+                  #  self.cam[i].ExposureAuto.SetValue(True)
                     s_node_map = self.cam[i].GetTLStreamNodeMap()
                     buffer_count = pyspin.CIntegerPtr(s_node_map.GetNode('StreamBufferCountManual'))
                     buffer_count.SetValue(200);
@@ -168,7 +168,8 @@ class MultiCamObj:
     def FramesInBuffer(self):
         # Only primary camera should matter- everything else should be synced. So only return its
         # buffer as representative of the entire MultiCam system. 
-        FramesRemaining=self.cam[0].TransferQueueCurrentBlockCount()        
+        #FramesRemaining=self.cam[0].TransferQueueCurrentBlockCount() #Camera
+        FramesRemaining=self.cam[0].TLStream.StreamOutputBufferCount() #USB buffers
         return FramesRemaining;
 
     def GetNextImage(self):         
@@ -228,10 +229,14 @@ class MultiCamObj:
         try:            
             # Set 1st Cam, others follow.
             self.cam[0].ExposureAuto.SetValue(pyspin.ExposureAuto_Off)
-            exposure = min(self.cam[0].ExposureTime.GetMax(), exposure)
-            self.cam[0].ExposureTime.SetValue(exposure);
-            self.exposuretime=self.cam[0].ExposureTime();
-            self.framerate=self.cam[0].AcquisitionFrameRate();            
+            #exposure = min(self.cam[0].ExposureTime.GetMax(), exposure*1000)
+            self.cam[0].ExposureTime.SetValue(exposure*1000);
+            self.exposuretime=self.cam[0].ExposureTime()/1000;
+            self.cam[0].AcquisitionFrameRateEnable.SetValue(True)
+            framerate=1/(self.exposuretime/1000)
+            self.cam[0].AcquisitionFrameRate.SetValue(framerate);
+            self.framerate=self.cam[0].AcquisitionFrameRate();
+                       
             return self.exposuretime;
         
         except pyspin.SpinnakerException as ex:
@@ -243,9 +248,15 @@ class MultiCamObj:
             # Set 1st Cam, others follow.
             self.cam[0].AcquisitionFrameRateEnable.SetValue(True)
             self.cam[0].AcquisitionFrameRate.SetValue(rate);
+            self.cam[0].ExposureAuto.SetValue(pyspin.ExposureAuto_Off)
             self.framerate=self.cam[0].AcquisitionFrameRate();
-            self.exposuretime=self.cam[0].ExposureTime();
-            return self.framerate; 
+            uSExposureTime= (1000/self.framerate)*1000
+        #    print(uSExposureTime)
+      #      pdb.set_trace()            
+            self.cam[0].ExposureTime.SetValue(uSExposureTime)
+            self.exposuretime=self.cam[0].ExposureTime()/1000;
+            return self.framerate;
+        
         except pyspin.SpinnakerException as ex:
             print('Error: %s' % ex);
         return False          
@@ -481,8 +492,8 @@ class MultiCamObj:
             return False    
 #### Testing stuff
 ##import cv2
-##cams=listCams();
-##amc=MultiCamObj(cams[0]); #The 2 color blackfly
+#cams=listCams();
+#amc=MultiCamObj(cams[0]); #The 2 color blackfly
 ##amc.ClearROI();
 ##rois=[]
 ##j=0
