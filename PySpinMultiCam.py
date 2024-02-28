@@ -1,4 +1,3 @@
-#import pyspin
 import PySpin as pyspin
 import pdb
 import time;
@@ -87,7 +86,7 @@ class MultiCamObj:
                   #  self.cam[i].ExposureAuto.SetValue(True)
                     s_node_map = self.cam[i].GetTLStreamNodeMap()
                     buffer_count = pyspin.CIntegerPtr(s_node_map.GetNode('StreamBufferCountManual'))
-                    buffer_count.SetValue(200);
+                    buffer_count.SetValue(buffer_count.GetMax());
                     handling_mode = pyspin.CEnumerationPtr(s_node_map.GetNode('StreamBufferHandlingMode'))
                     handling_mode_entry = handling_mode.GetEntryByName('OldestFirst')
                     handling_mode.SetIntValue(handling_mode_entry.GetValue())
@@ -168,8 +167,7 @@ class MultiCamObj:
     def FramesInBuffer(self):
         # Only primary camera should matter- everything else should be synced. So only return its
         # buffer as representative of the entire MultiCam system. 
-        #FramesRemaining=self.cam[0].TransferQueueCurrentBlockCount() #Camera
-        FramesRemaining=self.cam[0].TLStream.StreamOutputBufferCount() #USB buffers
+        FramesRemaining=self.cam[0].TransferQueueCurrentBlockCount()        
         return FramesRemaining;
 
     def GetNextImage(self):         
@@ -228,14 +226,16 @@ class MultiCamObj:
     def SetExposureTime(self,exposure): # in uS
         try:            
             # Set 1st Cam, others follow.
-            self.cam[0].ExposureAuto.SetValue(pyspin.ExposureAuto_Off)
-            #exposure = min(self.cam[0].ExposureTime.GetMax(), exposure*1000)
-            self.cam[0].ExposureTime.SetValue(exposure*1000);
-            self.exposuretime=self.cam[0].ExposureTime()/1000;
-            self.cam[0].AcquisitionFrameRateEnable.SetValue(True)
-            framerate=1/(self.exposuretime/1000)
-            self.cam[0].AcquisitionFrameRate.SetValue(framerate);
-            self.framerate=self.cam[0].AcquisitionFrameRate();
+
+            for j in range(self.camcount):
+                self.cam[j].ExposureAuto.SetValue(pyspin.ExposureAuto_Off)
+                #exposure = min(self.cam[0].ExposureTime.GetMax(), exposure*1000)
+                self.cam[j].ExposureTime.SetValue(exposure*1000);
+                self.exposuretime=self.cam[0].ExposureTime()/1000;
+                self.cam[j].AcquisitionFrameRateEnable.SetValue(True)
+                framerate=1/(self.exposuretime/1000)
+                self.cam[j].AcquisitionFrameRate.SetValue(framerate);
+                self.framerate=self.cam[0].AcquisitionFrameRate();
                        
             return self.exposuretime;
         
@@ -246,15 +246,16 @@ class MultiCamObj:
     def SetFrameRate(self,rate): #in Hz
         try:
             # Set 1st Cam, others follow.
-            self.cam[0].AcquisitionFrameRateEnable.SetValue(True)
-            self.cam[0].AcquisitionFrameRate.SetValue(rate);
-            self.cam[0].ExposureAuto.SetValue(pyspin.ExposureAuto_Off)
-            self.framerate=self.cam[0].AcquisitionFrameRate();
-            uSExposureTime= (1000/self.framerate)*1000
+            for j in range(self.camcount):
+                self.cam[j].AcquisitionFrameRateEnable.SetValue(True)
+                self.cam[j].AcquisitionFrameRate.SetValue(rate);
+                self.cam[j].ExposureAuto.SetValue(pyspin.ExposureAuto_Off)
+                self.framerate=self.cam[0].AcquisitionFrameRate();
+                uSExposureTime= (1000/self.framerate)*1000
         #    print(uSExposureTime)
       #      pdb.set_trace()            
-            self.cam[0].ExposureTime.SetValue(uSExposureTime)
-            self.exposuretime=self.cam[0].ExposureTime()/1000;
+                self.cam[j].ExposureTime.SetValue(uSExposureTime)
+                self.exposuretime=self.cam[j].ExposureTime()/1000;
             return self.framerate;
         
         except pyspin.SpinnakerException as ex:
@@ -291,7 +292,9 @@ class MultiCamObj:
             print('Error: %s' % ex);
         return False           
         
-    def SaveImageSequenceAVI(self, framecount,filename):
+    def SaveImageSequenceAVI(self, framecount, filename):
+        import os
+
         try:            
             timeout=500; # Something has gone wrong at this point.
             avi_handler=[];
@@ -303,9 +306,11 @@ class MultiCamObj:
                 avi_header_settings.append(pyspin.AVIOption());
                 avi_header_settings[j].frameRate=self.framerate;
                 avi_header_settings[j].height=self.height[j];
-                avi_header_settings[j].width=self.width[j];                 
-                filename=filename+'CAM_'+str(j)+'.avi'   
-                avi_handler[j].Open(filename,avi_header_settings[j])
+                avi_header_settings[j].width=self.width[j];
+
+                filename_camJ=f'{filename}_CAM{j}' # filename with camera info 
+                avi_handler[j].Open(filename_camJ,avi_header_settings[j])
+
             i=0;    
             #while (0< framecount): #for i in range(framecount):
                            
@@ -324,8 +329,9 @@ class MultiCamObj:
             print('Error: %s' % ex);
         return FailedCount
     
-    def SaveImageTimeSeriesAVI(self, time,filename): #in S
+    def SaveImageTimeSeriesAVI(self, time, filename): #in S
         from math import ceil
+
         framecount=ceil(self.framerate*time);
         print(framecount)
         try:            
@@ -339,9 +345,10 @@ class MultiCamObj:
                 avi_header_settings.append(pyspin.AVIOption());
                 avi_header_settings[j].frameRate=self.framerate;
                 avi_header_settings[j].height=self.height[j];
-                avi_header_settings[j].width=self.width[j];                
-                filename=filename+'CAM_'+str(j)+'.avi'   
-                avi_handler[j].Open(filename,avi_header_settings[j])
+                avi_header_settings[j].width=self.width[j];    
+
+                filename_camJ=f'{filename}_CAM{j}' # filename with camera info 
+                avi_handler[j].Open(filename_camJ,avi_header_settings[j])
 
             for i in range(framecount):
                   for j in range(self.camcount):    
@@ -353,13 +360,13 @@ class MultiCamObj:
             for j in range(self.camcount):                       
                 avi_handler[j].Close()
         
-            FailedCount=self.CheckLostFrames();
-            print(FailedCount)                      
+            # FailedCount=self.CheckLostFrames();
+            # print(FailedCount)                      
         except pyspin.SpinnakerException as ex:
             print('Error: %s' % ex);
-        return FailedCount
+       # return FailedCount
     
-    def SaveImageSequenceTIFF(self, framecount,filename): 
+    def SaveImageSequenceTIFF(self, framecount, filename): 
         from libtiff import TIFF
         from PIL import Image
         
@@ -370,8 +377,8 @@ class MultiCamObj:
            # tme=int(time.time())
             for j in range(self.camcount):
                 
-                filename=filename+'CAM_'+str(j)+'.tiff'   
-                tif_handler.append(TIFF.open(filename, mode = 'w'));                
+                filename_camJ=f'{filename}_CAM{j}' # filename with camera info 
+                tif_handler.append(TIFF.open(filename_camJ, mode = 'w'));                
                 
             for i in range(framecount):
                   for j in range(self.camcount):
@@ -389,7 +396,7 @@ class MultiCamObj:
             print('Error: %s' % ex);
         return FailedCount
 
-    def SaveImageTimeSeriesTIFF(self, framecount,filename): 
+    def SaveImageTimeSeriesTIFF(self, framecount, filename): 
         from libtiff import TIFF
         from PIL import Image
         from math import ceil
@@ -402,8 +409,8 @@ class MultiCamObj:
             
             for j in range(self.camcount):
                 
-                filename=filename+'CAM_'+str(j)+'.tiff'   
-                tif_handler.append(TIFF.open(filename, mode = 'w'));                
+                filename_camJ=f'{filename}_CAM{j}' # filename with camera info 
+                tif_handler.append(TIFF.open(filename_camJ, mode = 'w'));                
                 
             for i in range(framecount):
                   for j in range(self.camcount):
