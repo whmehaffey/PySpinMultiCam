@@ -1,0 +1,30 @@
+# Github actions to build
+# and push wheel files
+on:
+  push:
+    branches:
+      - main
+      - master
+
+jobs:
+  build_wheel:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: 3.10.13
+      - name: Build wheel and install
+        run: |
+          pip wheel . --wheel-dir ./dist
+          find ./dist/*.whl | xargs pip install
+      - name: Configure Git
+        run: |
+          git config --global user.name "github actions"
+          git config --global user.email "<>"
+      - name: Commit and push wheel
+        run: |
+          git add -f ./dist/*.whl
+          git commit -m 'new wheel'
+          git push

@@ -1,0 +1,22 @@
+[build-system]
+requires = [
+    "hatchling",
+]
+build-backend = "hatchling.build"
+
+[project]
+name = "PySpinMultiCam"
+dynamic = ["version"]
+authors = [
+  { name="Hamish Mehaffey" },
+]
+description = "Simple library for controlling/syncing multiple Spinnaker (Blackfly) cams"
+license = {file = "LICENSE"}
+readme = "README.md"
+requires-python = ">=3.10"
+
+[project.urls]
+Homepage = "https://github.com/whmehaffey/PySpinMultiCam"
+
+[tool.hatch.version]
+path = "src/PySpinMultiCam/__about__.py"
